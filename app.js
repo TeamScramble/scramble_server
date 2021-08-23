@@ -9,15 +9,16 @@ const io = socket(server);
 import Room from './src/rooms.js';
 import * as utils from './src/utils.js';
 
-const MAXROOM = 20;
+const MAX_ROOM = 20;
 
 // 서버에서 방 객체 관리
-let rooms = {};
+const rooms = {};
 
 io.sockets.on('connection', function (socket) {
   console.log('소켓 연결');
 
   // name : 사용자가 닉네임 입력
+  // todo : nameCheck function 구현(createRoom, enterRoom)
   socket.on('createRoom', function (data) {
     roomId = utils.makeRoomId(rooms);
     rooms.roomId = Room();
@@ -35,7 +36,7 @@ io.sockets.on('connection', function (socket) {
         name: 'SERVER',
         message: '잘못된 입장코드입니다.',
       });
-    } else if (rooms.data.roomId.userCount > MAXROOM) {
+    } else if (rooms.data.roomId.userCount > MAX_ROOM) {
       io.to(socket.id).emit('failRoom', {
         type: 'fail',
         name: 'SERVER',
