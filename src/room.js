@@ -1,4 +1,4 @@
-export class Room {
+module.exports = class {
   constructor() {
     this.round = 1;
     this.maxRound = 10;
@@ -17,4 +17,4 @@ export class Room {
   get userCount() {
     return this.users.length;
   }
-}
+};

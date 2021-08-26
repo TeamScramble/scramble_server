@@ -4,10 +4,15 @@ const http = require('http');
 const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
-const io = socket(server);
+//const io = socket(server);
+const io = socket(server, {
+  cors: {
+    origin: '*',
+  },
+});
 
-import Room from './src/rooms.js';
-import * as utils from './src/utils.js';
+const Room = require('./src/room.js');
+const utils = require('./src/utils.js');
 
 const MAX_ROOM = 20;
 
@@ -17,29 +22,38 @@ const rooms = {};
 io.sockets.on('connection', function (socket) {
   console.log('소켓 연결');
 
-  // name : 사용자가 닉네임 입력
-  // todo : nameCheck function 구현(createRoom, enterRoom)
+  // 방과 관련된 event
   socket.on('createRoom', function (data) {
-    roomId = utils.makeRoomId(rooms);
-    rooms.roomId = Room();
-    rooms.roomId.enterUser(socket.id);
-    socket.join(roomId);
-    socket.owner = true;
-    socket.roomId = roomId;
-    // 대기실로 입장 처리 필요함. 이벤트로 해야될지?
+    console.log('createRoom 실행');
+    if (!utils.nameCheck(data.name)) {
+      socket.emit('failRoom', {
+        message: '잘못된 닉네임입니다.',
+      });
+    } else {
+      roomId = utils.makeRoomId(rooms);
+      rooms.roomId = new Room();
+      rooms.roomId.enterUser(socket.id);
+      socket.join(roomId);
+      socket.owner = true;
+      socket.roomId = roomId;
+      socket.name = data.name;
+      socket.emit('enterSuccess', {
+        roomId: roomId,
+      });
+    }
   });
 
   socket.on('enterRoom', function (data) {
-    if (!rooms.hasOwnProperty(data.roomId)) {
-      io.to(socket.id).emit('failRoom', {
-        type: 'fail',
-        name: 'SERVER',
+    if (!utils.nameCheck(data.name)) {
+      socket.emit('failRoom', {
+        message: '잘못된 닉네임입니다.',
+      });
+    } else if (!rooms.hasOwnProperty(data.roomId)) {
+      socket.emit('failRoom', {
         message: '잘못된 입장코드입니다.',
       });
     } else if (rooms.data.roomId.userCount > MAX_ROOM) {
-      io.to(socket.id).emit('failRoom', {
-        type: 'fail',
-        name: 'SERVER',
+      socket.emit('failRoom', {
         message: '방이 가득 찼습니다.',
       });
     } else {
@@ -47,6 +61,10 @@ io.sockets.on('connection', function (socket) {
       socket.join(data.roomId);
       socket.owner = false;
       socket.roomId = data.roomId;
+      socket.name = data.name;
+      socket.emit('enterSuccess', {
+        roomId: roomId,
+      });
     }
   });
 
@@ -71,4 +89,6 @@ io.sockets.on('connection', function (socket) {
   socket.on('changeOwner', function (data) {
     socket.owner = true;
   });
+  //-------------------------------------------------------
+  //-------------------------------------------------------
 });
