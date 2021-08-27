@@ -6,8 +6,9 @@ exports.makeRoomId = function (rooms) {
   return randomId;
 };
 
-exports.nameCheck = function (name) {
-  return name.length > 1 && name.length <= 10;
+exports.nameCheck = function (nickname) {
+  console.log(nickname);
+  return nickname && nickname.length > 1 && nickname.length <= 20;
 };
 
 exports.makeLog = function (message) {

@@ -26,10 +26,9 @@ server.listen(8080, function () {
 io.sockets.on('connection', function (socket) {
   utils.makeLog(socket.id + ' 연결');
 
-  // 방과 관련된 event
   socket.on('create room', function (data) {
-    utils.makeLog('create room 실행');
-    if (!utils.nameCheck(data.name)) {
+    utils.makeLog('create room 실행, nickname : ' + data.nickname + socket.id);
+    if (!utils.nameCheck(data.nickname)) {
       socket.emit('enter fail', {
         message: '잘못된 닉네임입니다.',
       });
@@ -40,9 +39,9 @@ io.sockets.on('connection', function (socket) {
       socket.join(roomId);
       socket.owner = true;
       socket.roomId = roomId;
-      socket.nickname = data.name;
+      socket.nickname = data.nickname;
       socket.emit('enter success', {
-        roomId: roomId,
+        room_id: roomId,
       });
     }
   });
@@ -66,7 +65,7 @@ io.sockets.on('connection', function (socket) {
       socket.join(data.roomId);
       socket.owner = false;
       socket.roomId = data.roomId;
-      socket.nickname = data.name;
+      socket.nickname = data.nickname;
       socket.emit('enter success', {
         roomId: roomId,
       });
@@ -93,14 +92,13 @@ io.sockets.on('connection', function (socket) {
   socket.on('change owner', function (data) {
     socket.owner = true;
   });
-  //-------------------------------------------------------
-  //-------------------------------------------------------
 
   //to do : 전달 데이터, 시작 실패 예외 처리
   socket.on('start game', function (data) {
-    utils.makeLog('start game 실행');
-    rooms.socket.roomId.round = data.round;
-    io.in(socekt.roomId).emit('start success', {});
+    utils.makeLog('start game 실행, 방 : ' + socket.roomId);
+    roomId = socket.roomId;
+    rooms.roomId.round = data.round;
+    io.in(roomId).emit('start success', { message: 'babo' });
   });
 
   socket.on('disconnect', function () {
