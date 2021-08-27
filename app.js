@@ -13,6 +13,7 @@ const io = socket(server, {
 
 const Room = require('./src/room.js');
 const utils = require('./src/utils.js');
+const { util } = require('prettier');
 
 const MAX_ROOM = 20;
 
@@ -29,79 +30,95 @@ io.sockets.on('connection', function (socket) {
   socket.on('create room', function (data) {
     utils.makeLog('create room 실행, nickname : ' + data.nickname + socket.id);
     if (!utils.nameCheck(data.nickname)) {
-      socket.emit('enter fail', {
+      socket.emit('join fail', {
         message: '잘못된 닉네임입니다.',
       });
     } else {
-      roomId = utils.makeRoomId(rooms);
-      rooms.roomId = new Room();
-      rooms.roomId.enterUser(socket.id);
+      const roomId = utils.makeRoomId(rooms);
+      rooms[roomId] = new Room();
+      rooms[roomId].joinUser(socket.id);
       socket.join(roomId);
-      socket.owner = true;
       socket.roomId = roomId;
       socket.nickname = data.nickname;
-      socket.emit('enter success', {
+      socket.emit('create success', {
         room_id: roomId,
       });
     }
   });
 
-  socket.on('enter room', function (data) {
-    utils.makeLog('enter room 실행');
+  socket.on('join room', function (data) {
+    const roomId = data.room_id;
+    utils.makeLog('join room 실행' + roomId);
     if (!utils.nameCheck(data.nickname)) {
-      socket.emit('enter fail', {
+      socket.emit('join fail', {
         message: '잘못된 닉네임입니다.',
       });
-    } else if (!rooms.hasOwnProperty(data.room_id)) {
-      socket.emit('enter fail', {
+    } else if (!rooms.hasOwnProperty(roomId)) {
+      socket.emit('join fail', {
         message: '잘못된 입장코드입니다.',
       });
-    } else if (rooms.data.roomId.userCount > MAX_ROOM) {
-      socket.emit('enter fail', {
+    } else if (rooms[roomId].userCount > MAX_ROOM) {
+      socket.emit('join fail', {
         message: '방이 가득 찼습니다.',
       });
     } else {
-      rooms.data.roomId.enterUser(socket.id);
-      socket.join(data.roomId);
-      socket.owner = false;
-      socket.roomId = data.roomId;
+      rooms[roomId].joinUser(socket.id);
+      socket.join(roomId);
+      socket.roomId = roomId;
       socket.nickname = data.nickname;
-      socket.emit('enter success', {
+      socket.emit('join success', {
         roomId: roomId,
+      });
+      utils.makeLog(rooms);
+      io.in(roomId).emit('update user', {
+        users: rooms[roomId].users,
       });
     }
   });
 
   socket.on('leave room', function (data) {
-    roomId = socket.roomId;
-    utils.makeLog('leave room 실행');
-    if (socket.owner) {
-      if (rooms.roomId.userCount == 1) {
-        delete rooms.roomId;
-      } else {
-        rooms.roomId.leaveUser(socket.id);
-        nextOwner = rooms.roomId.firstUser;
-        socket.leave(socket.roomId);
-        socket.roomId = '';
-        io.to(nextOwner).emit('change owner', {});
-      }
-    }
-    socket.disconnect();
-  });
-
-  socket.on('change owner', function (data) {
-    socket.owner = true;
+    socket.disconnecting();
   });
 
   //to do : 전달 데이터, 시작 실패 예외 처리
   socket.on('start game', function (data) {
     utils.makeLog('start game 실행, 방 : ' + socket.roomId);
-    roomId = socket.roomId;
-    rooms.roomId.round = data.round;
-    io.in(roomId).emit('start success', { message: 'babo' });
+    const roomId = socket.roomId;
+    rooms[roomId].round = data.round;
+    io.in(roomId).emit('start success', {});
   });
 
-  socket.on('disconnect', function () {
+  //to do : 정답이냐 구분하는 것
+  socket.on('send message', function (data) {
+    socket.emit('show message', {
+      message: data.message,
+      type: 'MINE',
+    });
+    socket.to(socket.roomId).emit('show message', {
+      message: data.message,
+      type: 'OTHER',
+    });
+  });
+
+  socket.on('disconnecting', function () {
+    if (socket.roomId) {
+      console.log('냐냐냐', socket.roomId);
+      const roomId = socket.roomId;
+      utils.makeLog('leave room 실행');
+      if (rooms[roomId].owner == socket.id) {
+        console.log('방장은 ', socket.nickname);
+        if (rooms[roomId].userCount == 1) {
+          delete rooms[roomId];
+        } else {
+          rooms[roomId].leaveUser(socket.id);
+          socket.leave(socket.roomId);
+          socket.roomId = '';
+          io.in(roomId).emit('update user', {
+            users: rooms[roomId].users,
+          });
+        }
+      }
+    }
     utils.makeLog(socket.id + ' 퇴장');
   });
 });

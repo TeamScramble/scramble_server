@@ -4,14 +4,14 @@ module.exports = class {
     this.maxRound = 10;
     this.users = [];
   }
-  enterUser(id) {
+  joinUser(id) {
     this.users.push(id);
   }
   leaveUser(id) {
-    idx = this.users.indexOf(id);
+    const idx = this.users.indexOf(id);
     this.users.splice(idx, 1);
   }
-  get firstUser() {
+  get owner() {
     return this.users[0];
   }
   get userCount() {
