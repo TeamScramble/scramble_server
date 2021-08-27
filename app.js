@@ -19,14 +19,18 @@ const MAX_ROOM = 20;
 // 서버에서 방 객체 관리
 const rooms = {};
 
+server.listen(8080, function () {
+  utils.makeLog('서버 실행');
+});
+
 io.sockets.on('connection', function (socket) {
-  console.log('소켓 연결');
+  utils.makeLog(socket.id + ' 연결');
 
   // 방과 관련된 event
-  socket.on('createRoom', function (data) {
-    console.log('createRoom 실행');
+  socket.on('create room', function (data) {
+    utils.makeLog('create room 실행');
     if (!utils.nameCheck(data.name)) {
-      socket.emit('failRoom', {
+      socket.emit('enter fail', {
         message: '잘못된 닉네임입니다.',
       });
     } else {
@@ -36,24 +40,25 @@ io.sockets.on('connection', function (socket) {
       socket.join(roomId);
       socket.owner = true;
       socket.roomId = roomId;
-      socket.name = data.name;
-      socket.emit('enterSuccess', {
+      socket.nickname = data.name;
+      socket.emit('enter success', {
         roomId: roomId,
       });
     }
   });
 
-  socket.on('enterRoom', function (data) {
-    if (!utils.nameCheck(data.name)) {
-      socket.emit('failRoom', {
+  socket.on('enter room', function (data) {
+    utils.makeLog('enter room 실행');
+    if (!utils.nameCheck(data.nickname)) {
+      socket.emit('enter fail', {
         message: '잘못된 닉네임입니다.',
       });
-    } else if (!rooms.hasOwnProperty(data.roomId)) {
-      socket.emit('failRoom', {
+    } else if (!rooms.hasOwnProperty(data.room_id)) {
+      socket.emit('enter fail', {
         message: '잘못된 입장코드입니다.',
       });
     } else if (rooms.data.roomId.userCount > MAX_ROOM) {
-      socket.emit('failRoom', {
+      socket.emit('enter fail', {
         message: '방이 가득 찼습니다.',
       });
     } else {
@@ -61,34 +66,44 @@ io.sockets.on('connection', function (socket) {
       socket.join(data.roomId);
       socket.owner = false;
       socket.roomId = data.roomId;
-      socket.name = data.name;
-      socket.emit('enterSuccess', {
+      socket.nickname = data.name;
+      socket.emit('enter success', {
         roomId: roomId,
       });
     }
   });
 
-  socket.on('leaveRoom', function (data) {
+  socket.on('leave room', function (data) {
+    roomId = socket.roomId;
+    utils.makeLog('leave room 실행');
     if (socket.owner) {
-      if (rooms.socket.roomId.userCount == 1) {
-        delete rooms.socket.roomId;
+      if (rooms.roomId.userCount == 1) {
+        delete rooms.roomId;
       } else {
-        rooms.socket.roomId.leaveUser(socket.id);
-        nextOwner = rooms.socket.roomId.firstUser;
+        rooms.roomId.leaveUser(socket.id);
+        nextOwner = rooms.roomId.firstUser;
         socket.leave(socket.roomId);
         socket.roomId = '';
-        io.to(nextOwner).emit('changeOwner', {
-          type: 'change',
-          name: 'SERVER',
-          message: '방장이 되었습니다.',
-        });
+        io.to(nextOwner).emit('change owner', {});
       }
     }
+    socket.disconnect();
   });
 
-  socket.on('changeOwner', function (data) {
+  socket.on('change owner', function (data) {
     socket.owner = true;
   });
   //-------------------------------------------------------
   //-------------------------------------------------------
+
+  //to do : 전달 데이터, 시작 실패 예외 처리
+  socket.on('start game', function (data) {
+    utils.makeLog('start game 실행');
+    rooms.socket.roomId.round = data.round;
+    io.in(socekt.roomId).emit('start success', {});
+  });
+
+  socket.on('disconnect', function () {
+    utils.makeLog(socket.id + ' 퇴장');
+  });
 });

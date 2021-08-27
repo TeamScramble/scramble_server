@@ -9,3 +9,7 @@ exports.makeRoomId = function (rooms) {
 exports.nameCheck = function (name) {
   return name.length > 1 && name.length <= 10;
 };
+
+exports.makeLog = function (message) {
+  console.log(message);
+};
