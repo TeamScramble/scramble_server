@@ -13,4 +13,5 @@ exports.nameCheck = function (nickname) {
 
 exports.makeLog = function (message) {
   console.log(message);
+  console.log('--------------------------------------------');
 };
