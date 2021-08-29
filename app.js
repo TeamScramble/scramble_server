@@ -10,10 +10,10 @@ const io = socket(server, {
     origin: '*',
   },
 });
+const { v4: uuidv4 } = require('uuid');
 
 const Room = require('./src/room.js');
 const utils = require('./src/utils.js');
-const { util } = require('prettier');
 
 const MAX_ROOM = 20;
 
@@ -29,7 +29,7 @@ io.sockets.on('connection', function (socket) {
 
   socket.on('create room', function (data) {
     utils.makeLog(
-      'create room 실행\n nickname : ' + data.nickname + +'\nid : ' + socket.id,
+      'create room 실행\nnickname : ' + data.nickname + '\nid : ' + socket.id,
     );
     if (!utils.nameCheck(data.nickname)) {
       socket.emit('join fail', {
@@ -47,7 +47,6 @@ io.sockets.on('connection', function (socket) {
       });
       io.in(roomId).emit('update user', {
         users: rooms[roomId].users,
-        nicknames: rooms[roomId].nicknames,
       });
     }
   });
@@ -75,12 +74,12 @@ io.sockets.on('connection', function (socket) {
       socket.roomId = roomId;
       socket.nickname = data.nickname;
       socket.emit('join success', {
-        roomId: roomId,
+        room_id: roomId,
+        is_playing: rooms[roomId].isPlaying,
       });
       utils.makeLog(rooms);
       io.in(roomId).emit('update user', {
         users: rooms[roomId].users,
-        nicknames: rooms[roomId].nicknames,
       });
     }
   });
@@ -97,16 +96,30 @@ io.sockets.on('connection', function (socket) {
     );
     const roomId = socket.roomId;
     rooms[roomId].round = data.round;
-    io.in(roomId).emit('start success', {});
+    rooms[roomId].startGame();
+    io.in(roomId).emit('start success', {
+      users: rooms[roomId].users,
+    });
   });
 
   //to do : 정답이냐 구분하는 것
   socket.on('send message', function (data) {
+    const id = uuidv4();
+    utils.log(
+      'send message 실행\n nickname : ' +
+        socket.nickname +
+        '\nmessage : ' +
+        data.message +
+        '\nroom id : ' +
+        socket.roomId,
+    );
     socket.emit('show message', {
+      id: id,
       message: data.message,
       type: 'MINE',
     });
     socket.to(socket.roomId).emit('show message', {
+      id: id,
       message: data.message,
       type: 'OTHER',
     });
@@ -114,21 +127,17 @@ io.sockets.on('connection', function (socket) {
 
   socket.on('disconnecting', function () {
     if (socket.roomId) {
-      console.log('냐냐냐', socket.roomId);
       const roomId = socket.roomId;
-      utils.makeLog('leave room 실행');
-      if (rooms[roomId].owner == socket.id) {
-        if (rooms[roomId].userCount == 1) {
-          delete rooms[roomId];
-        } else {
-          rooms[roomId].leaveUser(socket.id, socket.nickname);
-          socket.leave(socket.roomId);
-          socket.roomId = '';
-          io.in(roomId).emit('update user', {
-            users: rooms[roomId].users,
-            nicknames: rooms[roomId].nicknames,
-          });
-        }
+      console.log('leave room 실행');
+      rooms[roomId].leaveUser(socket.id);
+      socket.leave(socket.roomId);
+      socket.roomId = undefined;
+      if (rooms[roomId].userCount == 0) {
+        delete rooms[roomId];
+      } else {
+        io.in(roomId).emit('update user', {
+          users: rooms[roomId].users,
+        });
       }
     }
     utils.makeLog(socket.id + ' 퇴장\nnickname : ' + socket.nickname);
