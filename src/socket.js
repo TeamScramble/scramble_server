@@ -108,6 +108,14 @@ module.exports = function (io) {
       });
     });
 
+    socket.on('drawing', function (data) {
+      io.in(socket.roomId).emit('drawing', data);
+    });
+
+    socket.on('clear board', function (data) {
+      io.in(socket.roomId).emit('clear board', data);
+    });
+
     socket.on('disconnecting', function () {
       if (socket.roomId) {
         const roomId = socket.roomId;
