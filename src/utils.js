@@ -7,11 +7,14 @@ exports.makeRoomId = function (rooms) {
 };
 
 exports.nameCheck = function (nickname) {
-  console.log(nickname);
   return nickname && nickname.length > 1 && nickname.length <= 20;
 };
 
 exports.makeLog = function (message) {
   console.log(message);
   console.log('--------------------------------------------');
+};
+
+exports.getWords = function () {
+  return ['1', '2', '3'];
 };
