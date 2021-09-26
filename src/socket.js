@@ -25,7 +25,7 @@ module.exports = function (io) {
               user에게 create success, update user list, show message(입장)을 전송
       #=========================================# 
     */
-    socket.on('create room', function (data, ack) {
+    socket.on('create room', function (data) {
       utils.makeLog(
         `create room 실행\n
         nickname : ${data.nickname}\n
@@ -35,7 +35,7 @@ module.exports = function (io) {
         socket.emit('join fail', {
           message: '잘못된 닉네임입니다.',
         });
-        ack('fail');
+        // ack('fail');
       } else {
         const roomId = utils.makeRoomId(rooms);
         rooms[roomId] = new Room();
@@ -56,7 +56,7 @@ module.exports = function (io) {
           user_id: socket.id,
           nickname: socket.nickname,
         });
-        ack('success');
+        // ack('success');
       }
     });
 
@@ -129,17 +129,20 @@ module.exports = function (io) {
       @ brief : owner가 게임 시작 버튼을 누를시 호출
       @ data
         round : owner가 설정한 최대 라운드
+        time : owner가 설정한 최대 시간
       @ post : 방에 속한 user들에게 start round 전송
       #=========================================# 
     */
     socket.on('start game', function (data) {
+      data.time = 60;
       utils.makeLog(
         `start game 실행\n
         방 : ${socket.roomId}\n
-        round : ${data.round}`,
+        round : ${data.round}\n
+        time : ${data.time}`,
       );
       const roomId = socket.roomId;
-      rooms[roomId].startGame(data.round);
+      rooms[roomId].startGame(data.round, data.time);
       io.in(roomId).emit('start round', {
         round: 1,
         users: rooms[roomId].users,
@@ -153,7 +156,7 @@ module.exports = function (io) {
       @ post
         user가 정답을 이미 맞춘 경우 : 방 안의 user들에게 show message(type:solved) 전송
         정답인 경우 : 해당 user에게 correct answer 전송
-                    방 안의 user들에게 update score, show message(type:correct) 전송
+                    방 안의 user들에게 show message(type:correct) 전송
           -> 모든 인원이 정답을 맞춘 경우는 finishSet function 실행
         그 외 : 방 안의 user들에게 show message(type:all) 전송
       #=========================================# 
@@ -180,9 +183,6 @@ module.exports = function (io) {
         //ack('correct');
         rooms[roomId].solve(socket.id, 10);
         socket.emit('correct answer', {});
-        io.in(roomId).emit('update score', {
-          users: rooms[roomId].users,
-        });
         io.in(roomId).emit('show message', {
           type: MESSAGE_TYPE.correct,
           id: id,
@@ -191,6 +191,7 @@ module.exports = function (io) {
           nickname: socket.nickname,
         });
         if (rooms[roomId].isFinishSet) {
+          //TO DO : questioner 점수
           setTimeout(finishSet, 1000, roomId);
           //finishSet(roomId);
         }
@@ -257,13 +258,16 @@ module.exports = function (io) {
       @ brief : questioner가 문제를 선택하면 호출
       @ data
         word : 선택한 단어
-      @ post : 방 안의 user들에게 start set 전송
+      @ post
+        방 안의 user들에게 start set 전송
+        시간을 관리하는 setTimeClock 호출
       #=========================================#
     */
     socket.on('choice word', function (data) {
       const roomId = socket.roomId;
       rooms[roomId].answer = data.word;
       io.in(socket.roomId).emit('start set', {});
+      setTimeClock(roomId);
     });
 
     /*#=========================================#
@@ -282,6 +286,7 @@ module.exports = function (io) {
         socket.leave(socket.roomId);
         socket.roomId = undefined;
         if (rooms[roomId].userCount == 0) {
+          clearInterval(rooms[roomId].timeClock);
           delete rooms[roomId];
         } else {
           io.in(roomId).emit('update user list', {
@@ -304,7 +309,8 @@ module.exports = function (io) {
 
     /*#=========================================#
       @ brief : 한 set가 끝난 경우
-      @ data
+      @ arguments
+        roomId : 방의 고유 ID
       @ post 
         마지막 round의 마지막 set인 경우 : finish game 전송
         중간 round의 마지막 set인 경우 : finish round 전송
@@ -312,6 +318,8 @@ module.exports = function (io) {
       #=========================================#
     */
     function finishSet(roomId) {
+      clearInterval(rooms[roomId].timeClock);
+      io.in(roomId).emit('clear board', {});
       rooms[roomId].finishSet();
       utils.makeLog(
         `set : ${rooms[roomId].set}\n
@@ -330,8 +338,31 @@ module.exports = function (io) {
           });
         }
       } else {
-        io.in(roomId).emit('finish set', {});
+        io.in(roomId).emit('finish set', {
+          users: rooms[roomId].users,
+        });
       }
+    }
+
+    /*#=========================================#
+      @ brief : 각 set가 시작하는 경우
+      @ arguments
+        roomId : 방의 고유 ID
+      @ post 
+        maxTime부터 시작해서 1초 마다 줄어든 시간 전송
+        time이 0이되는 순간 전송 종료 및 세트 종료
+          -> finishSet 호출
+      #=========================================#
+    */
+    function setTimeClock(roomId) {
+      rooms[roomId].time = rooms[roomId].maxTime;
+      rooms[roomId].timeClock = setInterval(function () {
+        io.in(roomId).emit('get time', { time: rooms[roomId].time });
+        if (--rooms[roomId].time == -1) {
+          clearInterval(rooms[roomId].timeClock);
+          finishSet(roomId);
+        }
+      }, 1000);
     }
   });
 };

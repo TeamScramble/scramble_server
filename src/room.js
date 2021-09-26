@@ -8,6 +8,9 @@ module.exports = class {
     this.set = 0;
     this.answer = '';
     this.solver = new Set();
+    this.maxTime = 60;
+    this.time = 60;
+    this.timeClock;
   }
   joinUser(id, nickname) {
     const user = {
@@ -32,8 +35,9 @@ module.exports = class {
   isSolved(id) {
     return this.solver.has(id);
   }
-  startGame(maxRound) {
+  startGame(maxRound, maxTime) {
     this.maxRound = maxRound;
+    this.maxTime = this.time = maxTime;
     this.isPlaying = true;
     this.round = 0;
     this.solver.clear();
